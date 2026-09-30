@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Role {
+  name String @id
+  users User[]
+  permissions RolePermission[]
+  sidebarPermissions SidebarPermission[]
+  sectionRoles SectionRole[]
+  itemRoles ItemRole[]
+}
+model Permission {
+  name String @id
+  roles RolePermission[]
+}
+model RolePermission {
+  roleName String
+  permissionName String
+  role Role @relation(fields:[roleName],references:[name],onDelete:Cascade)
+  permission Permission @relation(fields:[permissionName],references:[name],onDelete:Cascade)
+  @@id([roleName,permissionName])
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String
+  passwordHash String
+  roleName String @default("USER")
+  enabled Boolean @default(true)
+  role Role @relation(fields:[roleName],references:[name])
+  sessions Session[]
+  groups UserGroup[]
+  revisions SidebarRevision[]
+  audit AuditLog[]
+  assignments SidebarAssignment[]
+  badges BadgeValue[]
+  createdAt DateTime @default(now())
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Group {
+  id String @id @default(cuid())
+  name String @unique
+  users UserGroup[]
+  assignments SidebarAssignment[]
+}
+model UserGroup {
+  userId String
+  groupId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  group Group @relation(fields:[groupId],references:[id],onDelete:Cascade)
+  @@id([userId,groupId])
+}
+model Sidebar {
+  id String @id @default(cuid())
+  name String
+  priority Int @default(0)
+  configurations SidebarConfiguration[]
+  revisions SidebarRevision[]
+  audit AuditLog[]
+}
+model SidebarConfiguration {
+  id String @id @default(cuid())
+  sidebarId String
+  state String
+  name String
+  schemaVersion Int @default(1)
+  version Int @default(1)
+  branding Json
+  behavior Json
+  appearance Json
+  animations Json
+  activeTheme String
+  sidebar Sidebar @relation(fields:[sidebarId],references:[id],onDelete:Cascade)
+  sections SidebarSection[]
+  items SidebarItem[]
+  themes SidebarTheme[]
+  permissions SidebarPermission[]
+  assignments SidebarAssignment[]
+  updatedAt DateTime @updatedAt
+  @@unique([sidebarId,state])
+}
+model SidebarSection {
+  id String
+  configurationId String
+  name String
+  label String
+  hideLabel Boolean
+  order Int
+  enabled Boolean
+  collapsible Boolean
+  defaultExpanded Boolean
+  footer Boolean
+  configuration SidebarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Cascade)
+  items SidebarItem[]
+  roles SectionRole[]
+  @@id([configurationId,id])
+  @@index([configurationId,order])
+}
+model SidebarItem {
+  id String
+  configurationId String
+  sectionId String
+  parentId String?
+  label String
+  name String
+  description String
+  icon String
+  url String
+  newTab Boolean
+  order Int
+  activeMatch String
+  activePattern String
+  tooltip String
+  badge String
+  badgeColor String
+  badgeProvider String
+  className String
+  visible Boolean
+  enabled Boolean
+  archived Boolean
+  action String
+  configuration SidebarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Cascade)
+  section SidebarSection @relation(fields:[configurationId,sectionId],references:[configurationId,id],onDelete:Cascade)
+  parent SidebarItem? @relation("ItemTree",fields:[configurationId,parentId],references:[configurationId,id],onDelete:NoAction,onUpdate:NoAction)
+  children SidebarItem[] @relation("ItemTree")
+  roles ItemRole[]
+  @@id([configurationId,id])
+  @@index([configurationId,sectionId,parentId,order])
+}
+model SidebarTheme {
+  id String
+  configurationId String
+  name String
+  light Json
+  dark Json
+  configuration SidebarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Cascade)
+  @@id([configurationId,id])
+}
+model SidebarPermission {
+  configurationId String
+  roleName String
+  configuration SidebarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Cascade)
+  role Role @relation(fields:[roleName],references:[name])
+  @@id([configurationId,roleName])
+}
+model SidebarAssignment {
+  id String @id @default(cuid())
+  configurationId String
+  userId String?
+  groupId String?
+  configuration SidebarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Cascade)
+  user User? @relation(fields:[userId],references:[id],onDelete:Cascade)
+  group Group? @relation(fields:[groupId],references:[id],onDelete:Cascade)
+  @@index([configurationId])
+}
+model SectionRole {
+  configurationId String
+  sectionId String
+  roleName String
+  section SidebarSection @relation(fields:[configurationId,sectionId],references:[configurationId,id],onDelete:Cascade)
+  role Role @relation(fields:[roleName],references:[name])
+  @@id([configurationId,sectionId,roleName])
+}
+model ItemRole {
+  configurationId String
+  itemId String
+  roleName String
+  item SidebarItem @relation(fields:[configurationId,itemId],references:[configurationId,id],onDelete:Cascade)
+  role Role @relation(fields:[roleName],references:[name])
+  @@id([configurationId,itemId,roleName])
+}
+model SidebarRevision {
+  id String @id @default(cuid())
+  sidebarId String
+  actorId String?
+  action String
+  snapshot Json
+  version Int
+  createdAt DateTime @default(now())
+  sidebar Sidebar @relation(fields:[sidebarId],references:[id],onDelete:Cascade)
+  actor User? @relation(fields:[actorId],references:[id],onDelete:SetNull)
+  @@index([sidebarId,createdAt])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  sidebarId String?
+  actorId String?
+  action String
+  target String
+  before Json?
+  after Json?
+  createdAt DateTime @default(now())
+  sidebar Sidebar? @relation(fields:[sidebarId],references:[id],onDelete:SetNull)
+  actor User? @relation(fields:[actorId],references:[id],onDelete:SetNull)
+  @@index([sidebarId,createdAt])
+}
+model Preset {
+  id String @id @default(cuid())
+  name String @unique
+  protected Boolean @default(false)
+  snapshot Json
+  createdAt DateTime @default(now())
+}
+model LoginAttempt {
+  key String @id
+  attempts Int @default(0)
+  windowStart DateTime @default(now())
+}
+model BadgeValue {
+  userId String
+  provider String
+  value String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  updatedAt DateTime @updatedAt
+  @@id([userId,provider])
+}
